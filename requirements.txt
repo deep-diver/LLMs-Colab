@@ -1,0 +1,16 @@
+torch
+bitsandbytes
+datasets
+loralib
+sentencepiece
+git+https://github.com/huggingface/transformers.git
+git+https://github.com/huggingface/peft.git
+gradio
+bingbong
+git+https://github.com/huggingface/optimum.git
+git+https://github.com/huggingface/accelerate.git
+tokenizers==0.13.3
+einops
+scipy
+protobuf==3.20.*
+llmpool
