@@ -7,12 +7,20 @@ from gens.batch_gen import get_output_batch
 
 from pingpong.context import CtxLastWindowStrategy
 
-def build_prompts(ppmanager, user_message, win_size=3):
+def build_prompts(ppmanager, user_message, global_context, win_size=3):
     dummy_ppm = copy.deepcopy(ppmanager)
+    
+    dummy_ppm.ctx = global_context
+    for pingpong in dummy_ppm.pingpongs:
+        pong = pingpong.pong
+        first_sentence = pong.split("\n")[0]
+        if first_sentence != "" and \
+            pre.contains_image_markdown(first_sentence):
+            pong = ' '.join(pong.split("\n")[1:]).strip()
+            pingpong.pong = pong
+            
     lws = CtxLastWindowStrategy(win_size)
     
-    dummy_ppm.ctx = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request."""
-
     prompt = lws(dummy_ppm)
     return prompt
 
@@ -46,7 +54,7 @@ def summarize(
 
 def chat_stream(
     idx, local_data, user_message, state, model_num,
-    ctx_num_lconv, ctx_sum_prompt,
+    global_context, ctx_num_lconv, ctx_sum_prompt,
     res_temp, res_topp, res_topk, res_rpen, res_mnts, res_beams, res_cache, res_sample, res_eosid, res_padid,
 ):
     res = [
@@ -60,7 +68,7 @@ def chat_stream(
     ppm.add_pingpong(
         PingPong(user_message, "")
     )
-    prompt = build_prompts(ppm, user_message, ctx_num_lconv)
+    prompt = build_prompts(ppm, user_message, global_context, ctx_num_lconv)
 
     # prepare text generating streamer & start generating
     gen_kwargs, streamer = pre.build(

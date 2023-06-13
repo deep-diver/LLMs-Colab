@@ -1,5 +1,6 @@
 import time
 import json
+import re
 from os import listdir
 from os.path import isfile, join
 import gradio as gr
@@ -9,7 +10,7 @@ from chats import central
 from transformers import AutoModelForCausalLM
 from miscs.styles import MODEL_SELECTION_CSS
 from miscs.js import GET_LOCAL_STORAGE, UPDATE_LEFT_BTNS_STATE
-from utils import get_chat_interface, get_chat_manager
+from utils import get_chat_interface, get_chat_manager, get_global_context
 
 ex_file = open("examples.txt", "r")
 examples = ex_file.read().split("\n")
@@ -69,31 +70,56 @@ def set_popup_visibility(ld, example_block):
 def move_to_second_view(btn):
     info = model_info[btn]
 
+    guard_vram = 5 * 1024.
+    vram_req_full = int(info["vram(full)"]) + guard_vram
+    vram_req_8bit = int(info["vram(8bit)"]) + guard_vram
+    vram_req_4bit = int(info["vram(4bit)"]) + guard_vram
+    
+    load_mode_list = []
+    
     return (
         gr.update(visible=False),
         gr.update(visible=True),
         info["thumb"],
-        f"**Model name**\n: {btn}",
-        f"**Parameters**\n: {info['parameters']}",
+        f"## {btn}",
+        f"**Parameters**\n: Approx. {info['parameters']}",
         f"**🤗 Hub(base)**\n: {info['hub(base)']}",
-        f"**🤗 Hub(ckpt)**\n: {info['hub(ckpt)']}",
+        f"**🤗 Hub(LoRA)**\n: {info['hub(ckpt)']}",
+        info['desc'],
+        f"""**Min VRAM requirements** :
+|             half precision            |             load_in_8bit           |              load_in_4bit          | 
+| ------------------------------------- | ---------------------------------- | ---------------------------------- | 
+|   {round(vram_req_full/1024., 1)}GiB  | {round(vram_req_8bit/1024., 1)}GiB | {round(vram_req_4bit/1024., 1)}GiB |
+""",
+        info['default_gen_config'],
+        info['example1'],
+        info['example2'],
+        info['example3'],
+        info['example4'],
         "",
     )
 
 
 def move_to_first_view():
-    return (gr.update(visible=True), gr.update(visible=False))
+    return (
+        gr.update(visible=True), 
+        gr.update(visible=False),
+        ""
+    )
 
 
 def get_model_num(
     model_name
 ):
-    model_num = 0    
-    model_name = model_name.split(":")[-1].split("</p")[0].strip()
+    model_num = 0
+    re_tag = re.compile(r'<[^>]+>')
+    model_name = re_tag.sub('', model_name).strip()
+    print(model_name)    
     
     for idx, item in enumerate(global_vars.models):
         if item["model_name"] == model_name:
             model_num = idx
+            print(idx)
             break
             
     return "Download completed!", model_num
@@ -110,6 +136,7 @@ def move_to_third_view(model_num):
             "ppmanager_type": global_vars.models[model_num]["chat_manager"],
             "model_type": global_vars.models[model_num]["model_type"],
         },
+        get_global_context(global_vars.models[model_num]["model_type"]),
         gen_config.temperature,
         gen_config.top_p,
         gen_config.top_k,
@@ -157,83 +184,106 @@ def rollback_last(idx, ld, state):
 with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
     with gr.Column() as model_choice_view:
         gr.Markdown("# Choose a Model", elem_classes=["center"])
-        gr.Markdown("### NOTE")
-        gr.Markdown(":If you want to re-select a model after entering the chat mode, you can do it by refreshing the web page. Sorry for the inconvenience for now, but it will be replaced with a better UI/UX soon")
+      
         with gr.Row(elem_id="container"):
             with gr.Column():
-                with gr.Row():
-                    with gr.Column(min_width=20):
-                        llama_deus_7b = gr.Button(
-                            "llama-deus-7b",
-                            elem_id="llama-deus-7b",
-                            elem_classes=["square"],
-                        )
-                        gr.Markdown("LLaMA Deus", elem_classes=["center"])                    
+                gr.Markdown("### NOTE")
+                gr.Markdown(":If you want to re-select a model after entering the chat mode, you can do it by refreshing the web page. Sorry for the inconvenience for now, but it will be replaced with a better UI/UX soon")                
+                with gr.Row(elem_classes=["sub-container"]):
+                    # with gr.Column(min_width=20):
+                    #     llama_deus_7b = gr.Button("llama-deus-7b", elem_id="llama-deus-7b", elem_classes=["square"])
+                    #     gr.Markdown("LLaMA Deus", elem_classes=["center"])                    
 
                     with gr.Column(min_width=20):                        
-                        baize_7b = gr.Button(
-                            "baize-7b",
-                            elem_id="baize-7b",
-                            elem_classes=["square"],
-                        )
+                        baize_7b = gr.Button("baize-7b", elem_id="baize-7b", elem_classes=["square"])
                         gr.Markdown("Baize", elem_classes=["center"])                            
                         
-                    with gr.Column(min_width=20):
-                        koalpaca = gr.Button(
-                            "koalpaca", elem_id="koalpaca", elem_classes=["square"]
-                        )
-                        gr.Markdown("koalpaca", elem_classes=["center"])                        
+#                     with gr.Column(min_width=20):
+#                         koalpaca = gr.Button("koalpaca", elem_id="koalpaca", elem_classes=["square"])
+#                         gr.Markdown("koalpaca", elem_classes=["center"])                        
                         
                     with gr.Column(min_width=20):
-                        evolinstruct_vicuna_13b = gr.Button(
-                            "evolinstruct-vicuna-13b",
-                            elem_id="evolinstruct-vicuna-13b",
-                            elem_classes=["square"],
-                        )
+                        evolinstruct_vicuna_13b = gr.Button("evolinstruct-vicuna-13b", elem_id="evolinstruct-vicuna-13b", elem_classes=["square"])
                         gr.Markdown("EvolInstruct Vicuna", elem_classes=["center"])                      
                         
                     with gr.Column(min_width=20):
-                        guanaco_33b = gr.Button(
-                            "guanaco-33b", elem_id="guanaco-33b", elem_classes=["square"]
-                        )
+                        guanaco_13b = gr.Button("guanaco-13b", elem_id="guanaco-13b", elem_classes=["square"])
                         gr.Markdown("Guanaco", elem_classes=["center"])
+                        
+                    with gr.Column(min_width=20):
+                        nous_hermes_13b = gr.Button("nous-hermes-13b", elem_id="nous-hermes-13b", elem_classes=["square"])
+                        gr.Markdown("Nous Hermes", elem_classes=["center"])                        
                         
                 progress_view = gr.Textbox(label="Progress")
 
     with gr.Column(visible=False) as model_review_view:
         gr.Markdown("# Confirm the chosen model", elem_classes=["center"])
+
         with gr.Column(elem_id="container2"):
+            gr.Markdown("Please expect loading time to be longer than expected. Depending on the size of models, it will probably take from 100 to 300 seconds or so. Especially, expect the longest loading time with MPT model.")
+
             with gr.Row():
                 model_image = gr.Image(None, interactive=False, show_label=False)
                 with gr.Column():
                     model_name = gr.Markdown("**Model name**")
-                    model_params = gr.Markdown("Parameters\n: ...")
+                    model_desc = gr.Markdown("...")                        
+                    model_params = gr.Markdown("Parameters\n: ...")             
                     model_base = gr.Markdown("🤗 Hub(base)\n: ...")
-                    model_ckpt = gr.Markdown("🤗 Hub(ckpt)\n: ...")
+                    model_ckpt = gr.Markdown("🤗 Hub(LoRA)\n: ...")
+                    model_vram = gr.Markdown(f"""**Minimal VRAM requirement** :
+|          half precision        |        load_in_8bit       |         load_in_4bit      | 
+| ------------------------------ | ------------------------- | ------------------------- | 
+|   {round(7830/1024., 1)}GiB    | {round(5224/1024., 1)}GiB | {round(4324/1024., 1)}GiB |
+""")
+                    model_thumbnail_tiny = gr.Textbox("", visible=False)
+
+            with gr.Column():
+                gen_config_path = gr.Dropdown(
+                    response_configs,
+                    value=response_configs[0],
+                    interactive=False,
+                    label="Gen Config(response)",
+                )
+
+                with gr.Accordion("Example showcases", open=False):
+                    with gr.Tab("Ex1"):
+                        example_showcase1 = gr.Chatbot(
+                            [("hello", "world"), ("damn", "good")]
+                        )
+                    with gr.Tab("Ex2"):
+                        example_showcase2 = gr.Chatbot(
+                            [("hello", "world"), ("damn", "good")]
+                        )
+                    with gr.Tab("Ex3"):
+                        example_showcase3 = gr.Chatbot(
+                            [("hello", "world"), ("damn", "good")]
+                        )
+                    with gr.Tab("Ex4"):
+                        example_showcase4 = gr.Chatbot(
+                            [("hello", "world"), ("damn", "good")]
+                        )
 
             with gr.Row():
                 back_to_model_choose_btn = gr.Button("Back")
                 confirm_btn = gr.Button("Confirm")
 
-            progress_view2 = gr.Textbox(label="Progress")                
+            with gr.Column(elem_classes=["progress-view"]):
+                txt_view = gr.Textbox(label="Status")
+                progress_view2 = gr.Textbox(label="Progress")
                 
     with gr.Column(visible=False) as chat_view:
         idx = gr.State(0)
         model_num = gr.State(0)
         chat_state = gr.State()
         local_data = gr.JSON({}, visible=False)
-
-        gr.Markdown("### NOTE")
-        gr.Markdown(":If you want to re-select a model, you need to refresh the web page. \
-                            Sorry for the inconvenience for now, but it will be replaced with a better UI/UX soon.")
-        gr.Markdown(":The chat histories are kept in your local browser, so you will be able to play with different models \
-                            while keeping the records of the previous conversations")
         
         with gr.Row():
             with gr.Column(scale=1, min_width=180):
                 gr.Markdown("GradioChat", elem_id="left-top")
 
                 with gr.Column(elem_id="left-pane"):
+                    chat_back_btn = gr.Button("Back", elem_id="chat-back-btn")
+                    
                     with gr.Accordion("Histories", elem_id="chat-history-accordion"):
                         channel_btns.append(gr.Button(channels[0], elem_classes=["custom-btn-highlight"]))
 
@@ -267,7 +317,7 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
                 with gr.Column(elem_id="aux-btns-popup", visible=True):
                     with gr.Row():
                         stop = gr.Button("Stop", elem_classes=["aux-btn"], interactive=False)
-                        regenerate = gr.Button("Regenerate", interactive=False, elem_classes=["aux-btn"])
+                        regenerate = gr.Button("Rege", interactive=False, elem_classes=["aux-btn"])
                         clean = gr.Button("Clean", elem_classes=["aux-btn"])
 
                 with gr.Accordion("Context Inspector", elem_id="aux-viewer", open=False):
@@ -285,9 +335,19 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
                     elem_id="prompt-txt"
                 )
 
-        with gr.Accordion("Constrol Panel", open=False) as control_panel:
+        with gr.Accordion("Control Panel", open=False) as control_panel:
             with gr.Column():
                 with gr.Column():
+                    gr.Markdown("#### Global context")
+                    with gr.Accordion("global context will persist during conversation, and it is placed at the top of the prompt", open=False):
+                        global_context = gr.Textbox(
+                            "global context",
+                            lines=5,
+                            max_lines=10,
+                            interactive=True,
+                            elem_id="global-context"
+                        )
+
                     gr.Markdown("#### GenConfig for **response** text generation")
                     with gr.Row():
                         res_temp = gr.Slider(0.0, 2.0, 0, step=0.1, label="temp", interactive=True)
@@ -315,17 +375,19 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
                         sum_eosid = gr.Number(value=0, visible=False, precision=0)
                         sum_padid = gr.Number(value=0, visible=False, precision=0)
 
-                with gr.Column(visible=False):
+                with gr.Column():
                     gr.Markdown("#### Context managements")
                     with gr.Row():
-                        ctx_num_lconv = gr.Slider(2, 6, 3, step=1, label="num of last talks to keep", interactive=True)
+                        ctx_num_lconv = gr.Slider(2, 10, 3, step=1, label="number of recent talks to keep", interactive=True)
                         ctx_sum_prompt = gr.Textbox(
                             "summarize our conversations. what have we discussed about so far?",
-                            label="design a prompt to summarize the conversations"
+                            label="design a prompt to summarize the conversations",
+                            visible=False
                         )
-
         btns = [
-            llama_deus_7b, koalpaca, evolinstruct_vicuna_13b, baize_7b, guanaco_33b,
+            baize_7b, nous_hermes_13b, evolinstruct_vicuna_13b, guanaco_13b
+            # baize_7b, evolinstruct_vicuna_13b, guanaco_13b, nous_hermes_13b
+            # llama_deus_7b, koalpaca, evolinstruct_vicuna_13b, baize_7b, guanaco_33b,
         ]
         for btn in btns:
             btn.click(
@@ -334,6 +396,8 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
                 [
                     model_choice_view, model_review_view,
                     model_image, model_name, model_params, model_base, model_ckpt,
+                    model_desc, model_vram, gen_config_path,
+                    example_showcase1, example_showcase2, example_showcase3, example_showcase4,
                     progress_view
                 ]
             )
@@ -341,7 +405,7 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
         back_to_model_choose_btn.click(
             move_to_first_view,
             None,
-            [model_choice_view, model_review_view]
+            [model_choice_view, model_review_view, progress_view2]
         )
         
         confirm_btn.click(
@@ -351,9 +415,8 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
         ).then(
             move_to_third_view,
             model_num,
-            [progress_view2, model_review_view, chat_view, chatbot, chat_state,
+            [progress_view2, model_review_view, chat_view, chatbot, chat_state, global_context,
             res_temp, res_topp, res_topk, res_rpen, res_mnts, res_beams, res_cache, res_sample, res_eosid, res_padid]
-            # sum_temp, sum_topp, sum_topk, sum_rpen, sum_mnts, sum_beams, sum_cache, sum_sample, sum_eosid, sum_padid]
         )
          
         for btn in channel_btns:
@@ -383,7 +446,7 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
         ).then(
             central.chat_stream,
             [idx, local_data, instruction_txtbox, chat_state, model_num,
-            ctx_num_lconv, ctx_sum_prompt,
+            global_context, ctx_num_lconv, ctx_sum_prompt,
             res_temp, res_topp, res_topk, res_rpen, res_mnts, res_beams, res_cache, res_sample, res_eosid, res_padid],
             [instruction_txtbox, chatbot, context_inspector, local_data],
         ).then(
@@ -398,7 +461,7 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
         ).then(
             central.chat_stream,
             [idx, local_data, instruction_txtbox, chat_state, model_num,
-            ctx_num_lconv, ctx_sum_prompt,
+            global_context, ctx_num_lconv, ctx_sum_prompt,
             res_temp, res_topp, res_topk, res_rpen, res_mnts, res_beams, res_cache, res_sample, res_eosid, res_padid],
             [instruction_txtbox, chatbot, context_inspector, local_data],            
         ).then(
@@ -422,6 +485,12 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
         ).then(
             None, local_data, None, 
             _js="(v)=>{ setStorage('local_data',v) }"
+        )
+        
+        chat_back_btn.click(
+            lambda: [gr.update(visible=False), gr.update(visible=True)],
+            None,
+            [chat_view, model_choice_view]
         )
         
         demo.load(

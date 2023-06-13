@@ -1,6 +1,6 @@
 import torch
-
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from optimum.bettertransformer import BetterTransformer
 
 def load_model(
@@ -14,16 +14,16 @@ def load_model(
     force_download_ckpt
 ):
     tokenizer = AutoTokenizer.from_pretrained(base)
-    tokenizer.pad_token_id = 1
-    tokenizer.eos_token_id = 0
     tokenizer.padding_side = "left"
-    
+
     if mode_cpu:
         print("cpu mode")
         model = AutoModelForCausalLM.from_pretrained(
             base, 
-            device_map={"": "cpu"}, 
+            device_map={"": "cpu"},
+            torch_dtype=torch.bfloat16,
             use_safetensors=False,
+            trust_remote_code=True
         )
             
     elif mode_mps:
@@ -31,8 +31,9 @@ def load_model(
         model = AutoModelForCausalLM.from_pretrained(
             base,
             device_map={"": "mps"},
-            torch_dtype=torch.float16,
+            torch_dtype=torch.bfloat16,
             use_safetensors=False,
+            trust_remote_code=True
         )
             
     else:
@@ -42,13 +43,14 @@ def load_model(
             base,
             load_in_8bit=mode_8bit,
             load_in_4bit=mode_4bit,
+            torch_dtype=torch.bfloat16,
             device_map="auto",
-            torch_dtype=torch.float16,
-            use_safetensors=False,
+            trust_remote_code=True,
+            use_safetensors=False
         )
 
         if not mode_8bit and not mode_4bit:
             model.half()
 
-    model = BetterTransformer.transform(model)
+    # model = BetterTransformer.transform(model)
     return model, tokenizer

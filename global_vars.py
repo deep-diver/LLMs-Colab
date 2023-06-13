@@ -1,9 +1,12 @@
+import gc
 import yaml
 import json
+import torch
 from transformers import GenerationConfig
 from models import alpaca, stablelm, koalpaca, flan_alpaca, mpt
 from models import camel, t5_vicuna, vicuna, starchat, redpajama, bloom
-from models import baize, guanaco
+from models import baize, guanaco, falcon, kullm, replit, airoboros
+from models import samantha_vicuna
 
 from utils import get_chat_interface, get_chat_manager
 
@@ -14,12 +17,38 @@ def get_model_type(model_info):
     ft_ckpt_url = model_info["hub(ckpt)"]
     
     model_type_tmp = "alpaca"
-    if "baize" in base_url.lower():
+    if "llms/wizardlm" in base_url.lower():
+        model_type_tmp = "wizardlm"
+    elif "chronos" in base_url.lower():
+        model_type_tmp = "chronos"
+    elif "lazarus" in base_url.lower():
+        model_type_tmp = "lazarus"
+    elif "samantha" in base_url.lower():
+        model_type_tmp = "samantha-vicuna"
+    elif "airoboros" in base_url.lower():
+        model_type_tmp = "airoboros"
+    elif "replit" in base_url.lower():
+        model_type_tmp = "replit-instruct"
+    elif "kullm" in base_url.lower():
+        model_type_tmp = "kullm-polyglot"
+    elif "nous-hermes" in base_url.lower():
+        model_type_tmp = "nous-hermes"
+    elif "guanaco" in base_url.lower():
+        model_type_tmp = "guanaco"
+    elif "wizardlm-uncensored-falcon" in base_url.lower():
+        model_type_tmp = "wizard-falcon"        
+    elif "falcon" in base_url.lower():
+        model_type_tmp = "falcon"
+    elif "baize" in base_url.lower():
         model_type_tmp = "baize"
+    elif "stable-vicuna" in base_url.lower():
+        model_type_tmp = "stable-vicuna"        
     elif "vicuna" in base_url.lower():
         model_type_tmp = "vicuna"
     elif "mpt" in base_url.lower():
         model_type_tmp = "mpt"
+    elif "redpajama-incite-7b-instruct" in base_url.lower():
+        model_type_tmp = "redpajama-instruct"
     elif "redpajama" in base_url.lower():
         model_type_tmp = "redpajama"
     elif "starchat" in base_url.lower():
@@ -36,8 +65,6 @@ def get_model_type(model_info):
         model_type_tmp = "t5-vicuna"
     elif "koalpaca-polyglot" in base_url.lower():
         model_type_tmp = "koalpaca-polyglot"
-    elif "stable-vicuna" in base_url.lower():
-        model_type_tmp = "stable-vicuna"
     elif "alpacagpt4" in ft_ckpt_url.lower():
         model_type_tmp = "alpaca-gpt4"
     elif "alpaca" in ft_ckpt_url.lower():
@@ -60,14 +87,16 @@ def initialize_globals():
     
     models = []
     model_names = [
-        "baize-7b",        
-        "llama-deus-7b",
+        "baize-7b",   
+        # "llama-deus-7b",
         "evolinstruct-vicuna-13b",
-        "koalpaca",
-        "guanaco-33b",
+        # "koalpaca",
+        "guanaco-13b",
+        "nous-hermes-13b"
     ]
     for model_name in model_names:
         model_info = model_infos[model_name]
+        model_thumbnail_tiny = model_info["thumb-tiny"]
         model_type = get_model_type(model_info)
         print(model_type)
         load_model = get_load_model(model_type)
@@ -75,36 +104,47 @@ def initialize_globals():
         model, tokenizer = load_model(
             base=model_info["hub(base)"],
             finetuned=model_info["hub(ckpt)"],
-            multi_gpu=True, 
+            mode_cpu=False,
+            mode_mps=False,
+            mode_full_gpu=True,
+            mode_8bit=False,
+            mode_4bit=False,
             force_download_ckpt=False
-        )
+        )        
         
         gen_config, gen_config_raw = get_generation_config(
-            model_info["res_gen_config_path"]
+            model_info["default_gen_config"]
         )
         
         models.append(
             {
                 "model_name": model_name,
+                "model_thumb_tiny": model_thumbnail_tiny,
                 "model_type": model_type,
                 "model": model,
                 "tokenizer": tokenizer,
                 "gen_config": gen_config,
                 "gen_config_raw": gen_config_raw,
                 "chat_interface": get_chat_interface(model_type),
-                "chat_manager": get_chat_manager(model_type)
+                "chat_manager": get_chat_manager(model_type),
             }
         )
         
 def get_load_model(model_type):
     if model_type == "alpaca" or \
         model_type == "alpaca-gpt4" or \
-        model_type == "llama-deus":
+        model_type == "llama-deus" or \
+        model_type == "nous-hermes" or \
+        model_type == "lazarus" or \
+        model_type == "chronos" or \
+        model_type == "wizardlm":
         return alpaca.load_model
     elif model_type == "stablelm" or model_type == "os-stablelm":
         return stablelm.load_model
     elif model_type == "koalpaca-polyglot":
         return koalpaca.load_model
+    elif model_type == "kullm-polyglot":
+        return kullm.load_model
     elif model_type == "flan-alpaca":
         return flan_alpaca.load_model
     elif model_type == "camel":
@@ -117,7 +157,8 @@ def get_load_model(model_type):
         return starchat.load_model
     elif model_type == "mpt":
         return mpt.load_model
-    elif model_type == "redpajama":
+    elif model_type == "redpajama" or \
+        model_type == "redpajama-instruct":
         return redpajama.load_model
     elif model_type == "vicuna":
         return vicuna.load_model
@@ -129,6 +170,14 @@ def get_load_model(model_type):
         return baize.load_model
     elif model_type == "guanaco":
         return guanaco.load_model
+    elif model_type == "falcon" or model_type == "wizard-falcon":
+        return falcon.load_model
+    elif model_type == "replit-instruct":
+        return replit.load_model
+    elif model_type == "airoboros":
+        return airoboros.load_model
+    elif model_type == "samantha-vicuna":
+        return samantha_vicuna.load_model
     else:
         return None
     
