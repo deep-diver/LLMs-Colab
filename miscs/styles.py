@@ -127,7 +127,6 @@ code {
 
 #right-pane {
   margin-left: 20px;
-  margin-right: 20px;
   background: white;
   border-radius: 20px;
 
@@ -313,6 +312,10 @@ code {
 #container {
   max-width: 70%;
   margin: auto;
+
+  @media screen and (max-width: 1000px) {
+      max-width: 90% !important;
+  }
 }
 
 #container2 {

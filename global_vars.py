@@ -88,11 +88,9 @@ def initialize_globals():
     models = []
     model_names = [
         "baize-7b",   
-        # "llama-deus-7b",
-        "evolinstruct-vicuna-13b",
-        # "koalpaca",
-        "guanaco-13b",
-        "nous-hermes-13b"
+        # "evolinstruct-vicuna-13b",
+        # "guanaco-13b",
+        # "nous-hermes-13b"
     ]
     for model_name in model_names:
         model_info = model_infos[model_name]

@@ -1,6 +1,7 @@
 import time
 import json
 import re
+import os
 from os import listdir
 from os.path import isfile, join
 import gradio as gr
@@ -187,8 +188,9 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
       
         with gr.Row(elem_id="container"):
             with gr.Column():
-                gr.Markdown("### NOTE")
-                gr.Markdown(":If you want to re-select a model after entering the chat mode, you can do it by refreshing the web page. Sorry for the inconvenience for now, but it will be replaced with a better UI/UX soon")                
+                gr.Markdown("""This application is built and provided for anyone who wants to try out open source Large Language Models for free. All the provided models are pre-downloaded and pre-loaded to maximize your experience. This application is hosted on [jarvislabs.ai](https://jarvislabs.ai/) with 3 x A6000 VM instance. This demo will be hosted until 13/07/2023, but you can run the same application on [jarvislabs.ai](https://jarvislabs.ai/) with arbitrary GPU options of your choice. Also, if you can run the same application on your own environment, be sure to check out the [project repository](https://github.com/deep-diver/LLM-As-Chatbot) for any further information.
+
+From this page, choose a model that you would like to try out. By selecting a model, you will see more detailed description of the model in a separate page. Also note that this page will appear whenever you refresh your browser tab. """)
                 with gr.Row(elem_classes=["sub-container"]):
                     # with gr.Column(min_width=20):
                     #     llama_deus_7b = gr.Button("llama-deus-7b", elem_id="llama-deus-7b", elem_classes=["square"])
@@ -220,7 +222,10 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
         gr.Markdown("# Confirm the chosen model", elem_classes=["center"])
 
         with gr.Column(elem_id="container2"):
-            gr.Markdown("Please expect loading time to be longer than expected. Depending on the size of models, it will probably take from 100 to 300 seconds or so. Especially, expect the longest loading time with MPT model.")
+            gr.Markdown("""The model is pre-downloaded and pre-loaded for your convenience in this demo application, so you don't need to worry about the `VRAM requirements`. It is there just as a reference. Also, proper `GenerationConfig` is selected and fixed, but you can adjust some of the hyper-parameters once you enter the chatting mode.
+
+Before deciding which model to use, you can expand `Example showcases` to see some of the recorded example pairs of question and answer. It will help you understanding better which model suits you well. Then, click `Confirm` button to enter the chatting mode. If you click `Back` button or refresh the browser tab, the model selection page will appear. 
+""")
 
             with gr.Row():
                 model_image = gr.Image(None, interactive=False, show_label=False)
@@ -276,6 +281,9 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
         model_num = gr.State(0)
         chat_state = gr.State()
         local_data = gr.JSON({}, visible=False)
+
+        gr.Markdown("# Chatting", elem_classes=["center"])
+        gr.Markdown("""This entire application is built on top of `Gradio`. You can select one of the 10 channels on the left side to start chatting with the model. The model type you chose appear as a label on the top left corner of the chat component as well. Furthermore, you will see which model has responded to your question in each turn with their unique icons. This is because you can go back and forth to select different models from time to time, and you can continue your conversation with different models. With models' icons, you will understand how the conversation has gone better.""")
         
         with gr.Row():
             with gr.Column(scale=1, min_width=180):
@@ -384,6 +392,12 @@ with gr.Blocks(css=MODEL_SELECTION_CSS, theme='gradio/soft') as demo:
                             label="design a prompt to summarize the conversations",
                             visible=False
                         )
+
+        gr.Markdown("""The control panel on the bottom side allows you to adjust three major hyper-parameters. First, you can set the global context of the conversation. Appropriate global context that is recommended by each model's authors is provided by default, but you can set it as you like. Second, you can adjust some of the hyper-parameters of the `GenerationConfig` to decide how you want the model to generate text. `Temperature`, `Top K`, and `New Max Tokens` are some of the available ones. Third, you can adjust the number of recent talks to keep track of. With bigger number, the model will see more of the past conversations.
+
+Lastly, there is a hidden panel on the top right corner, and it will appear when you hover your mouse around it. When expanding the panel, it shows what the model actually sees. That is you can double check how the entire prompt is constructed and fed into the model at each conversation.
+""")
+                        
         btns = [
             baize_7b, nous_hermes_13b, evolinstruct_vicuna_13b, guanaco_13b
             # baize_7b, evolinstruct_vicuna_13b, guanaco_13b, nous_hermes_13b
@@ -506,5 +520,6 @@ demo.queue(
 ).launch(
     server_port=6006, 
     server_name="0.0.0.0", 
-    debug=True
+    debug=True,
+    root_path=f"/{os.getenv('TOKEN')}"
 )
